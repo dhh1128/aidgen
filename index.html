@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <script src="nacl-fast.min.js"></script>
+
+  <title>Generate AID and Ed25519 keys to use with KERI</title>
+  <style>
+    body { font-size: 11pt; background-color: white; color:#666; margin: 24px; font-family: 'Open Sans',Helvetica,Arial,Lucida,sans-serif;}
+    h1, h2 { color: #a3c74e; font-family: 'Cormorant Garamond',Georgia,"Times New Roman",serif;font-weight:700;font-size:25px;line-height:1.5em}
+    h2 { font-size: 20px; margin-bottom: 2px; }
+    input { border:none; background-color: #ca8d34; font-size: 13pt; padding: 8px; color: white; margin-bottom: 20px; border-radius: 8px; cursor:pointer;}
+    code { font-weight: bold; border: solid 1px #808080; padding: 4px; margin-bottom: 4px; font-size: 110%; background-color: #e0ffe0; }
+    p, li { margin-top: 0.3em; } p.x { padding-left: 2em; line-height: 1.8; } .warn { color: red; }
+    .results { padding: 8px; background-color: #f0f0f0; border: solid 1px #d0d0d0; }>
+    form { margin-top: 20px; }
+  </style>
+</head>
+
+<body>
+  <div id="step0">
+  <h1>Generate AID and Ed25519 keys to use with KERI</h1>
+  <p>How to run this code securely:</p>
+  <ul>
+    <li>Make sure you're viewing this page in an incognito/private browsing tab.</li>
+    <li>Inspect the source code for this page to make sure it's harmless.</li>
+    <li>Temporarily disconnect this machine from the internet, so you know secrets can't leak.</li>
+    <li>Click the button and follow the instructions that appear.</li>
+  </ul>
+  </div>
+  <div id="step1">
+    <form method="post">
+      <input type="button" value="Generate Keys" id="clk1" onsubmit="event.preventDefault(); return false;">
+    </form>
+  </div>
+  <div id="step2" style="display:none">
+    <h1 class="warn">Secrets -- private, do not share!</h1>
+    <div class="results">
+      <h2 class="warn">Signing Key</h2>
+        <p class="x"><code id="sigkey58" style="background-color:#ffe0e0"></code></p>
+      <h2 class="warn">Seed (same secret in a form useful for Sovrin CLI)</h2>
+      <p class="x"><code id="seed" style="background-color:#ffe0e0"></code></p>
+    </div>
+    <p><br/>Control of either of these secrets is what protects your identity. <span class="warn">Handle them with care.</span></p>
+    <p>Transfer these secrets to a password manager (copy everything in the
+      gray box), or write them down (or print them) and put the physical
+      paper in a safe or similarly secure location.
+      Then click the button to continue.</p>
+    <form method="post">
+      <input type="button" value="Okay, secrets are safe" id="clk2" onsubmit="event.preventDefault(); return false;">
+    </form>
+  </div>
+  <div id="step3" style="display:none">
+    <h1>AID and Public Key -- save, then share away!</h1>
+    <div class="results">
+    <h2>AID</h2>
+      <p class="x"><code id="did58"></code></p>
+    <h2>Verification Key</h2>
+      <p class="x"><code id="verkey58"></code></p>
+    </div>
+    <p><br/>You'll want to save these pieces of information as well, because you'll be sharing them in the future (e.g.,
+      when you publish them). Either keep them in the same place as the private secrets you just saved, or
+      put them somewhere else that still allows you to associate them as needed.</p>
+    <p>When you've saved this data as well, click the button to continue.</p>
+    <form method="post">
+      <input type="button" value="Next Step" id="clk3" onsubmit="event.preventDefault(); return false;">
+    </form>
+  </div>
+  <div id="step4" style="display:none">
+    <h1>Erase All Saved State</h1>
+    <p>If you used the clipoard or other services that could save state, it's important to clean up correctly.
+      Exit the browser and power off the machine. Let it sit for a minute or two to guarantee that its RAM decays.
+      Then reboot and reconnect the machine to the internet, and you are good to go.</p>
+    <p style="color:red">Refresh this page to start over.</p>
+  </div>
+  <hr/>
+  <p style="color:#c0c0c0;font-size:80%;font-style:italic">This page uses the <a href="https://tweetnacl.js.org/#/" target="_blank">TweetNaCL.js</a>
+    library to generate canonical Ed25519 keys entirely in javascript in a browser. These keys have to be encoded in Bitcoin-style base58 to
+    satisfy CESR. You can do the same work with <code style="border:none; background-color:inherit">ssh-keygen -t ed25519</code> plus a little bit of
+    python scripting; this tool is just a convenience for people with less interest in the low-level details.</p>
+</body>
+<script>
+  var MAP = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+  var to_b58 = function (B, A) { var d = [], s = "", i, j, c, n; for (i in B) { j = 0, c = B[i]; s += c || s.length ^ i ? "" : 1; while (j in d || c) { n = d[j]; n = n ? n * 256 + c : c; c = n / 58 | 0; d[j] = n % 58; j++ } } while (j--) s += A[d[j]]; return s };
+  var el = function(id) { return document.getElementById(id); }
+  var show = function(id, x) { el(id).style.display = x; }
+  var poke = function(id, val) { el(id).innerText = val; show(id); }
+  var hexpair = function(arr, i) { c = arr[i].toString(16); return c.length == 1 ? "0" + c : c; }
+
+  el("clk1").addEventListener("click", function () {
+    var seed = nacl.randomBytes(nacl.sign.seedLength);
+    var x = nacl.sign.keyPair.fromSeed(seed);
+    var vkBytes = [];
+    var skBytes = [];
+    var didBytes = [];
+    var seedHx = '';
+
+    for (i = 0; i < nacl.sign.seedLength; i++) {
+      seedHx += hexpair(seed, i);
+    }
+    for (i = 0; i < 32; i++) {
+      skBytes.push(x.secretKey[i]);
+    }
+    for (i = 32; i < 64; i++) {
+      vkBytes.push(x.secretKey[i]);
+      if (i < 48) {
+        didBytes.push(x.secretKey[i]);
+      }
+    }
+
+    poke("did58", to_b58(didBytes, MAP));
+    poke("verkey58", to_b58(vkBytes, MAP));
+    poke("sigkey58", to_b58(skBytes, MAP));
+    poke("seed", seedHx);
+    show("step1", "none");
+    show("step2", "block");
+    el("step0").style.display = "none";
+
+    return false;
+  });
+
+  el("clk2").addEventListener("click", function() { show("step2", "none"); show("step3", "block"); return false; });
+  el("clk3").addEventListener("click", function() { show("step3", "none"); show("step4", "block"); return false; });
+
+</script>
+
+</html>
